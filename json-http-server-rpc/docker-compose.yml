@@ -1,0 +1,12 @@
+services:
+  server:
+    build: .
+    command: go run server.go
+    ports:
+      - "1234:1234"
+
+  client:
+    build: .
+    command: go run client.go
+    depends_on:
+      - server
