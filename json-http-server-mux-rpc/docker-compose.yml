@@ -1,0 +1,34 @@
+services:
+  mux-rpc-log-server:
+    build: .
+    container_name: mux-rpc-log-server-container
+    ports:
+      - "8080:8080"
+      - "3214:3214"
+    networks:
+      - mux-rpc-log-network
+    restart: unless-stopped
+    environment:
+      SERVER_ENV: production
+      LOG_LEVEL: info
+
+  mux-rpc-log-client:
+    build: .
+    container_name: mux-rpc-log-client-container
+    depends_on:
+      - mux-rpc-log-server
+    entrypoint:
+      [
+        "./wait.sh",
+        "mux-rpc-log-server",
+        "3214",
+        "--",
+        "/mux-rpc/mux-rpc-log-client",
+      ]
+    networks:
+      - mux-rpc-log-network
+    restart: on-failure
+
+networks:
+  mux-rpc-log-network:
+    driver: bridge
