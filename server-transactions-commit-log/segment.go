@@ -18,6 +18,7 @@ type segment struct {
 }
 
 func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
+	// Open the store file associated with the baseOffset, creating it if it doesn't exist.
 	storeFile, err := os.OpenFile(
 		path.Join(dir, fmt.Sprintf("%d%s", baseOffset, ".store")),
 		os.O_RDWR|os.O_CREATE|os.O_APPEND,
@@ -27,11 +28,13 @@ func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
 		return nil, err
 	}
 
+	// Initialize the store using the opened file.
 	store, err := newStore(storeFile)
 	if err != nil {
 		return nil, err
 	}
 
+	// Open the index file associated with the baseOffset, creating it if it doesn't exist.
 	indexFile, err := os.OpenFile(
 		path.Join(dir, fmt.Sprintf("%d%s", baseOffset, ".index")),
 		os.O_RDWR|os.O_CREATE,
@@ -41,11 +44,13 @@ func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
 		return nil, err
 	}
 
+	// Initialize the index using the opened file and provided configuration.
 	index, err := newIndex(indexFile, c)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create a new segment with the initialized store, index, baseOffset, and configuration.
 	s := &segment{
 		store:      store,
 		index:      index,
@@ -53,16 +58,17 @@ func newSegment(dir string, baseOffset uint64, c Config) (*segment, error) {
 		config:     c,
 	}
 
-	// Calculates nextOffset based on index content
+	// Calculate nextOffset based on the content of the index.
 	lastOffset, _, err := index.Read(-1)
 	if err != nil {
-		// If there is an error reading the index, probably we have an empty index
+		// If there is an error reading the index, assume the index is empty.
 		s.nextOffset = baseOffset
 	} else {
-		// Increment nextOffset based on last offset registered in index
+		// Increment nextOffset based on the last offset recorded in the index.
 		s.nextOffset = baseOffset + uint64(lastOffset) + 1
 	}
 
+	// Return the initialized segment.
 	return s, nil
 }
 
