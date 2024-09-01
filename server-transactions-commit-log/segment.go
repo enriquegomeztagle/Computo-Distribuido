@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	log_v1 "server-transactions-commit-log/api/v1"
+	log_v1 "server-transactions-commit-log/api/v1" // Changed alias & path for package
 
 	"google.golang.org/protobuf/proto"
 )

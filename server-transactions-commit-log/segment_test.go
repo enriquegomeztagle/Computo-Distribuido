@@ -3,7 +3,7 @@ package log
 import (
 	"io"
 	"os"
-	log_v1 "server-transactions-commit-log/api/v1"
+	log_v1 "server-transactions-commit-log/api/v1" // Changed alias & path for package
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +17,7 @@ func TestSegment(t *testing.T) {
 
 	c := Config{}
 	c.Segment.MaxStoreBytes = 1024
-	c.Segment.MaxIndexBytes = uint64(entWidth * 3)  // Changed to uint according to the Config struct
+	c.Segment.MaxIndexBytes = uint64(entWidth * 3) // Changed to uint according to the Config struct
 
 	s, err := newSegment(dir, 16, c)
 	require.NoError(t, err)
