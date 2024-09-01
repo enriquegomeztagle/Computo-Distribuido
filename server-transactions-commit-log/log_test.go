@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	log_v1 "server-transactions-commit-log/api/v1"
+	log_v1 "server-transactions-commit-log/api/v1" // Changed alias & path for package
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
