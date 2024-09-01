@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 	"path"
-	log_v1 "server-transactions-commit-log/api/v1"
+	log_v1 "server-transactions-commit-log/api/v1" // Changed alias & path for package
 	"sort"
 	"strconv"
 	"strings"
@@ -46,37 +46,47 @@ func (l *Log) setup() error {
 	if err != nil {
 		return err
 	}
+
+	// added Map to track seen offsets to avoid duplicates
+	seenOffsets := make(map[uint64]bool)
 	var baseOffsets []uint64
 	for _, file := range files {
-		offStr := strings.TrimSuffix(
-			file.Name(),
-			path.Ext(file.Name()),
-		)
-		off, _ := strconv.ParseUint(offStr, 10, 0)
-		baseOffsets = append(baseOffsets, off)
+		offStr := strings.TrimSuffix(file.Name(), path.Ext(file.Name()))
+		off, err := strconv.ParseUint(offStr, 10, 0)
+		if err != nil {
+			continue
+		}
+
+		// avoid duplicate base offsets
+		if !seenOffsets[off] {
+			baseOffsets = append(baseOffsets, off)
+			seenOffsets[off] = true
+		}
 	}
+
 	sort.Slice(baseOffsets, func(i, j int) bool {
 		return baseOffsets[i] < baseOffsets[j]
 	})
+
 	for i := 0; i < len(baseOffsets); i++ {
 		if err = l.newSegment(baseOffsets[i]); err != nil {
 			return err
 		}
-		// baseOffset contains dup for index and store so we skip
-		// the dup
-		i++
 	}
+
 	if l.segments == nil {
 		if err = l.newSegment(l.Config.Segment.InitialOffset); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // END: setup
 
 // START: append
+// changed record type to log_v1.Record
 func (l *Log) Append(record *log_v1.Record) (uint64, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -93,6 +103,7 @@ func (l *Log) Append(record *log_v1.Record) (uint64, error) {
 // END: append
 
 // START: read
+// changed return type to *log_v1.Record
 func (l *Log) Read(off uint64) (*log_v1.Record, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -119,8 +130,10 @@ func (l *Log) newSegment(off uint64) error {
 	if err != nil {
 		return err
 	}
+
 	l.segments = append(l.segments, s)
 	l.activeSegment = s
+
 	return nil
 }
 
