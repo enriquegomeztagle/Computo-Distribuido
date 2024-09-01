@@ -3,6 +3,7 @@ package log
 import (
 	"io"
 	"os"
+	log_v1 "server-transactions-commit-log/api/v1"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,11 +13,11 @@ func TestSegment(t *testing.T) {
 	dir, _ := os.MkdirTemp("", "segment-test")
 	defer os.RemoveAll(dir)
 
-	want := &api.Record{Value: []byte("hello world")}
+	want := &log_v1.Record{Value: []byte("hello world")}
 
 	c := Config{}
 	c.Segment.MaxStoreBytes = 1024
-	c.Segment.MaxIndexBytes = entWidth * 3
+	c.Segment.MaxIndexBytes = uint64(entWidth * 3)  // Changed to uint according to the Config struct
 
 	s, err := newSegment(dir, 16, c)
 	require.NoError(t, err)
@@ -39,7 +40,7 @@ func TestSegment(t *testing.T) {
 	// maxed index
 	require.True(t, s.IsMaxed())
 
-	c.Segment.MaxStoreBytes = uint64(len(want.Value) * 3)
+	c.Segment.MaxStoreBytes = uint64(len(want.Value) * 3) // Changed to uint according to the Config struct
 	c.Segment.MaxIndexBytes = 1024
 
 	s, err = newSegment(dir, 16, c)
