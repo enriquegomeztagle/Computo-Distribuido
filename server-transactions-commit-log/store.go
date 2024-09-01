@@ -109,6 +109,7 @@ func (s *store) Close() error {
 	return s.File.Close()
 }
 
+// Name returns the name of the store file
 func (s *store) Name() string {
-    return s.File.Name()
+	return s.File.Name()
 }
