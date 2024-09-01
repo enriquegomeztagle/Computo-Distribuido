@@ -1,14 +1,15 @@
 FROM golang:1.20-buster
 
-RUN apt-get update && apt-get install -y protobuf-compiler \
-    && go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
-    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-ENV PATH="$PATH:/go/bin"
-
 WORKDIR /app
+
+ENV GOOS=darwin
+ENV GOARCH=amd64
+
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
-RUN make compile
+RUN go build -o commit-log ./cmd
 
-CMD ["make", "test"]
+CMD ["./commit-log"]
