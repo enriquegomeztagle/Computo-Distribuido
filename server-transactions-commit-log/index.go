@@ -22,12 +22,6 @@ type index struct {
 	mu   sync.Mutex
 }
 
-type Config struct {
-	Segment struct {
-		MaxIndexBytes int64
-	}
-}
-
 // newIndex creates a new index from a file
 func newIndex(f *os.File, c Config) (*index, error) {
 	// 1. Obtain the size of the file we are indexing
