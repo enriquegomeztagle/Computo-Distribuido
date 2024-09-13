@@ -1,192 +1,122 @@
+// START: types
 package server
 
 import (
 	"context"
-	"net"
-	"os"
-	"testing"
 
-	api "github.com/enriquegomeztagle/service-grpc-conn/api/v1"
-	"github.com/enriquegomeztagle/service-grpc-conn/internal/log"
-	"github.com/stretchr/testify/require"
+	api "service-grpc-conn/api/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 )
 
-func TestServer(t *testing.T) {
-	for scenario, fn := range map[string]func(
-		t *testing.T,
-		client api.LogClient,
-		config *Config,
-	){
-		"produce/consume a message to/from the log succeeeds": testProduceConsume,
-		"produce/consume stream succeeds":                     testProduceConsumeStream,
-		"consume past log boundary fails":                     testConsumePastBoundary,
-	} {
-		t.Run(scenario, func(t *testing.T) {
-			client, config, teardown := setupTest(t, nil)
-			defer teardown()
-			fn(t, client, config)
-		})
-	}
+type Config struct {
+	CommitLog CommitLog
 }
 
-// END: intro
-
-// START: setup
-func setupTest(t *testing.T, fn func(*Config)) (
-	client api.LogClient,
-	config *Config,
-	teardown func(),
-) {
-	t.Helper()
-
-	l, err := net.Listen("tcp", ":0")
-	require.NoError(t, err)
-	clientOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	cc, err := grpc.NewClient(l.Addr().String(), clientOptions...)
-	require.NoError(t, err)
-
-	dir, err := os.MkdirTemp("", "server-test")
-	require.NoError(t, err)
-
-	clog, err := log.NewLog(dir, log.Config{})
-	require.NoError(t, err)
-
-	config = &Config{
-		CommitLog: clog,
-	}
-	if fn != nil {
-		fn(config)
-	}
-	server, err := NewGRPCServer(config)
-	require.NoError(t, err)
-
-	go func() {
-		server.Serve(l)
-	}()
-
-	client = api.NewLogClient(cc)
-
-	return client, config, func() {
-		server.Stop()
-		cc.Close()
-		l.Close()
-		clog.Remove()
-	}
+type grpcServer struct {
+	*Config
 }
 
-// END: setup
-
-// START: produceconsume
-func testProduceConsume(t *testing.T, client api.LogClient, config *Config) {
-	ctx := context.Background()
-
-	want := &api.Record{
-		Value: []byte("hello world"),
+func newgrpcServer(config *Config) (srv *grpcServer, err error) {
+	srv = &grpcServer{
+		Config: config,
 	}
+	return srv, nil
+}
 
-	produce, err := client.Produce(
-		ctx,
-		&api.ProduceRequest{
-			Record: want,
-		},
-	)
-	require.NoError(t, err)
+// END: types
 
-	consume, err := client.Consume(ctx, &api.ConsumeRequest{
-		Offset: produce.Offset,
+// START: newapi
+func NewGRPCServer(config *Config) (*grpc.Server, error) {
+	gsrv := grpc.NewServer()
+	srv, err := newgrpcServer(config)
+	if err != nil {
+		return nil, err
+	}
+	api.RegisterLogService(gsrv, &api.LogService{
+		Produce:       srv.Produce,
+		Consume:       srv.Consume,
+		ConsumeStream: srv.ConsumeStream,
+		ProduceStream: srv.ProduceStream,
 	})
-	require.NoError(t, err)
-	require.Equal(t, want.Value, consume.Record.Value)
-	require.Equal(t, want.Offset, consume.Record.Offset)
+	return gsrv, nil
 }
 
-// END: produceconsume
+// END: newapi
 
-// START: consumeerror
-func testConsumePastBoundary(
-	t *testing.T,
-	client api.LogClient,
-	config *Config,
-) {
-	ctx := context.Background()
-
-	produce, err := client.Produce(ctx, &api.ProduceRequest{
-		Record: &api.Record{
-			Value: []byte("hello world"),
-		},
-	})
-	require.NoError(t, err)
-
-	consume, err := client.Consume(ctx, &api.ConsumeRequest{
-		Offset: produce.Offset + 1,
-	})
-	if consume != nil {
-		t.Fatal("consume not nil")
+// START: request_response
+func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (
+	*api.ProduceResponse, error) {
+	offset, err := s.CommitLog.Append(req.Record)
+	if err != nil {
+		return nil, err
 	}
-	got := status.Code(err)
-	want := status.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
-	if got != want {
-		t.Fatalf("got err: %v, want: %v", got, want)
-	}
+	return &api.ProduceResponse{Offset: offset}, nil
 }
 
-// END: consumeerror
+func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (
+	*api.ConsumeResponse, error) {
+	record, err := s.CommitLog.Read(req.Offset)
+	if err != nil {
+		return nil, err
+	}
+	return &api.ConsumeResponse{Record: record}, nil
+}
+
+// END: request_response
 
 // START: stream
-func testProduceConsumeStream(
-	t *testing.T,
-	client api.LogClient,
-	config *Config,
-) {
-	ctx := context.Background()
-
-	records := []*api.Record{{
-		Value:  []byte("first message"),
-		Offset: 0,
-	}, {
-		Value:  []byte("second message"),
-		Offset: 1,
-	}}
-
-	{
-		stream, err := client.ProduceStream(ctx)
-		require.NoError(t, err)
-
-		for offset, record := range records {
-			err = stream.Send(&api.ProduceRequest{
-				Record: record,
-			})
-			require.NoError(t, err)
-			res, err := stream.Recv()
-			require.NoError(t, err)
-			if res.Offset != uint64(offset) {
-				t.Fatalf(
-					"got offset: %d, want: %d",
-					res.Offset,
-					offset,
-				)
-			}
+func (s *grpcServer) ProduceStream(
+	stream api.Log_ProduceStreamServer,
+) error {
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			return err
 		}
-
-	}
-
-	{
-		stream, err := client.ConsumeStream(
-			ctx,
-			&api.ConsumeRequest{Offset: 0},
-		)
-		require.NoError(t, err)
-
-		for i, record := range records {
-			res, err := stream.Recv()
-			require.NoError(t, err)
-			require.Equal(t, res.Record, &api.Record{
-				Value:  record.Value,
-				Offset: uint64(i),
-			})
+		res, err := s.Produce(stream.Context(), req)
+		if err != nil {
+			return err
+		}
+		if err = stream.Send(res); err != nil {
+			return err
 		}
 	}
 }
+
+// START: consume_stream
+
+func (s *grpcServer) ConsumeStream(
+	req *api.ConsumeRequest,
+	stream api.Log_ConsumeStreamServer,
+) error {
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		default:
+			res, err := s.Consume(stream.Context(), req)
+			switch err.(type) {
+			case nil:
+			case api.ErrOffsetOutOfRange:
+				continue
+			default:
+				return err
+			}
+			if err = stream.Send(res); err != nil {
+				return err
+			}
+			req.Offset++
+		}
+	}
+}
+
+// END: consume_stream
+// END: stream
+
+// START: commitlog
+type CommitLog interface {
+	Append(*api.Record) (uint64, error)
+	Read(uint64) (*api.Record, error)
+}
+
+// END: commitlog
