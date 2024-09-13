@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	api "github.com/enriquegomeztagle/service-grpc-conn/api/v1"
+	api "service-grpc-conn/api/v1"
 )
 
 type Log struct {
