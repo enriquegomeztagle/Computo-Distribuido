@@ -6,7 +6,8 @@ import (
 	"os"
 	"path"
 
-	api "github.com/enriquegomeztagle/service-grpc-conn/api/v1"
+	api "service-grpc-conn/api/v1"
+
 	"google.golang.org/protobuf/proto"
 )
 
