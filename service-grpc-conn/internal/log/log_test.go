@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	api "github.com/enriquegomeztagle/service-grpc-conn/api/v1"
+	api "service-grpc-conn/api/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
