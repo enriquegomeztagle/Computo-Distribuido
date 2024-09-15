@@ -1,3 +1,3 @@
 {
-  "conventionalCommits.scopes": ["go-concurrency-patterns"]
+  "conventionalCommits.scopes": ["go-concurrency-patterns", "effective-concurrency-patterns"]
 }
