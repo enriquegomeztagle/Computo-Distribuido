@@ -1,3 +1,5 @@
+> [Source](https://medium.com/@gopinathr143/go-concurrency-patterns-a-deep-dive-a2750f98a102)
+
 # Introduction
 
 Concurrency is a fundamental concept in Go (Golang) that enables the execution of multiple tasks concurrently, making our applications efficient, responsive, and capable of utilizing multi-core processors effectively. One of the key aspects of concurrent programming in Go is the use of concurrency patterns. In this post, we’ll explore various Go concurrency patterns, why they are crucial, and provide real-world examples of their usage.
@@ -5,7 +7,6 @@ Concurrency is a fundamental concept in Go (Golang) that enables the execution o
 # What are Concurrency Patterns?
 
 Concurrency patterns are well-established solutions to common problems encountered in concurrent programming. They help us write robust and efficient concurrent code by providing structured approaches to manage goroutines, synchronize data access, and facilitate communication between concurrent tasks.
-
 
 # Why are Concurrency Patterns Important?
 
