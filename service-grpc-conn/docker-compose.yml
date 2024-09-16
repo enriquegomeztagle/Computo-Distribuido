@@ -1,27 +1,7 @@
 services:
-  build-and-copy:
-    image: commit-log-app-builder
+  grpc-conn:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - .:/output
-    entrypoint: >
-      /bin/sh -c "
-      cp /app/commit-log /output/commit-log;
-      echo 'Executable copied to host';
-      "
-
-  run-on-macos:
-    image: alpine:latest
-    volumes:
-      - .:/output
-    entrypoint: >
-      /bin/sh -c "
-      if [ -f /output/commit-log ]; then
-        chmod +x /output/commit-log;
-        /output/commit-log;
-      else
-        echo 'Executable not found!';
-      fi
-      "
+    ports:
+      - "9000:9000"
