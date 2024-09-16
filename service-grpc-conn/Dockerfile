@@ -1,15 +1,13 @@
-FROM golang:1.20-buster
+FROM golang:1.21
 
 WORKDIR /app
 
-ENV GOOS=darwin
-ENV GOARCH=amd64
-
 COPY go.mod go.sum ./
+
 RUN go mod download
 
 COPY . .
 
-RUN go build -o commit-log ./cmd
+RUN go build -o main ./cmd/main.go
 
-CMD ["./commit-log"]
+CMD ["./main"]
