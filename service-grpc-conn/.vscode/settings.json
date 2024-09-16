@@ -1,0 +1,6 @@
+
+{
+    "conventionalCommits.scopes": [
+        "service-grpc-conn"
+    ]
+}
