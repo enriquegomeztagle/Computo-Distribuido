@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	api "service-grpc-conn/api/v1"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +39,6 @@ func TestSegment(t *testing.T) {
 	_, err = s.Append(want)
 	require.Equal(t, io.EOF, err)
 
-	// maxed index
 	require.True(t, s.IsMaxed())
 
 	c.Segment.MaxStoreBytes = uint64(len(want.Value) * 3)
@@ -46,7 +46,6 @@ func TestSegment(t *testing.T) {
 
 	s, err = newSegment(dir, 16, c)
 	require.NoError(t, err)
-	// maxed store
 	require.True(t, s.IsMaxed())
 
 	err = s.Remove()

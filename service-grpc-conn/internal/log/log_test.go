@@ -1,4 +1,3 @@
-// START: intro
 package log
 
 import (
@@ -7,6 +6,7 @@ import (
 	"testing"
 
 	api "service-grpc-conn/api/v1"
+
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -36,9 +36,6 @@ func TestLog(t *testing.T) {
 	}
 }
 
-// END: intro
-
-// START: tests
 func testAppendRead(t *testing.T, log *Log) {
 	append := &api.Record{
 		Value: []byte("hello world"),
@@ -53,15 +50,12 @@ func testAppendRead(t *testing.T, log *Log) {
 
 }
 
-// START: test
 func testOutOfRangeErr(t *testing.T, log *Log) {
 	read, err := log.Read(1)
 	require.Nil(t, read)
 	apiErr := err.(api.ErrOffsetOutOfRange)
 	require.Equal(t, uint64(1), apiErr.Offset)
 }
-
-// END: test
 
 func testInitExisting(t *testing.T, o *Log) {
 	append := &api.Record{
@@ -124,5 +118,3 @@ func testTruncate(t *testing.T, log *Log) {
 	_, err = log.Read(0)
 	require.Error(t, err)
 }
-
-// END: tests

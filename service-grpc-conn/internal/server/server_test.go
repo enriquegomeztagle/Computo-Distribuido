@@ -1,10 +1,9 @@
-// START: intro
 package server
 
 import (
 	"context"
-	"io/ioutil"
 	"net"
+	"os"
 	"testing"
 
 	api "service-grpc-conn/api/v1"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func TestServer(t *testing.T) {
@@ -44,12 +45,11 @@ func setupTest(t *testing.T, fn func(*Config)) (
 
 	l, err := net.Listen("tcp", ":0")
 	require.NoError(t, err)
-
-	clientOptions := []grpc.DialOption{grpc.WithInsecure()}
-	cc, err := grpc.Dial(l.Addr().String(), clientOptions...)
+	clientOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	cc, err := grpc.NewClient(l.Addr().String(), clientOptions...)
 	require.NoError(t, err)
 
-	dir, err := ioutil.TempDir("", "server-test")
+	dir, err := os.MkdirTemp("", "server-test")
 	require.NoError(t, err)
 
 	clog, err := log.NewLog(dir, log.Config{})
@@ -127,8 +127,8 @@ func testConsumePastBoundary(
 	if consume != nil {
 		t.Fatal("consume not nil")
 	}
-	got := grpc.Code(err)
-	want := grpc.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
+	got := status.Code(err)
+	want := status.Code(api.ErrOffsetOutOfRange{}.GRPCStatus().Err())
 	if got != want {
 		t.Fatalf("got err: %v, want: %v", got, want)
 	}
@@ -191,5 +191,3 @@ func testProduceConsumeStream(
 		}
 	}
 }
-
-// END: stream
