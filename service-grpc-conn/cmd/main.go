@@ -1,117 +1,121 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
-	L "log"
+	"log"
+	"net"
 	"os"
-	log_v1 "server-transactions-commit-log/api/v1"
-	"server-transactions-commit-log/log"
-	"strings"
+
+	api "service-grpc-conn/api/v1"
+	log2 "service-grpc-conn/internal/log"
+	"service-grpc-conn/internal/server"
+
+	"google.golang.org/grpc"
 )
 
 func main() {
-	config := log.Config{}
+	dir := "./logdata"
+	if _, err := os.Stat(dir); err == nil {
+		os.RemoveAll(dir)
+	}
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		os.MkdirAll(dir, 0755)
+	}
+
+	config := log2.Config{}
 	config.Segment.MaxStoreBytes = 1024
 	config.Segment.MaxIndexBytes = 1024
 
-	dir := "./log_data"
-
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0755)
-		if err != nil {
-			L.Fatalf("Error while creating the directory %s: %v", dir, err)
-		}
-	}
-
-	lg, err := log.NewLog(dir, config)
+	commitLog, err := log2.NewLog(dir, config)
 	if err != nil {
-		L.Fatalf("Error while creating the log: %v", err)
+		log.Fatalf("failed to create log: %v", err)
 	}
-	defer lg.Close()
 
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Println("\nSelect an option:")
-		fmt.Println("1. Add a new record")
-		fmt.Println("2. Read a specific record")
-		fmt.Println("3. View lower and highest offsets")
-		fmt.Println("4. View all records")
-		fmt.Println("S. Exit")
+	serverConfig := &server.Config{
+		CommitLog: commitLog,
+	}
 
-		fmt.Print("Option: ")
-		option, _ := reader.ReadString('\n')
-		option = strings.TrimSpace(option)
+	grpcServer, err := server.NewGRPCServer(serverConfig)
+	if err != nil {
+		log.Fatalf("failed to create gRPC server: %v", err)
+	}
 
-		switch option {
-		case "1":
-			fmt.Print("Register value: ")
-			value, _ := reader.ReadString('\n')
-			value = strings.TrimSpace(value)
+	listener, err := net.Listen("tcp", ":9000")
+	if err != nil {
+		log.Fatalf("failed to listen on port 9000: %v", err)
+	}
 
-			record := &log_v1.Record{Value: []byte(value)}
-			offset, err := lg.Append(record)
-			if err != nil {
-				L.Printf("Error while adding the record: %v", err)
-			} else {
-				fmt.Printf("Record added at offset %d\n", offset)
-			}
-
-		case "2":
-			fmt.Print("Offset to search: ")
-			var offset uint64
-			fmt.Scanf("%d", &offset)
-
-			record, err := lg.Read(offset)
-			if err != nil {
-				L.Printf("Error while reading the record: %v", err)
-			} else {
-				fmt.Printf("Record at offset %d: %s\n", offset, record.Value)
-			}
-
-		case "3":
-			lowestOffset, err := lg.LowestOffset()
-			if err != nil {
-				L.Printf("Error while obtaining the lowest offset: %v", err)
-			} else {
-				fmt.Printf("Lowest offset: %d\n", lowestOffset)
-			}
-
-			highestOffset, err := lg.HighestOffset()
-			if err != nil {
-				L.Printf("Error while obtaining the highest offset: %v", err)
-			} else {
-				fmt.Printf("Highest offset: %d\n", highestOffset)
-			}
-
-		case "4":
-			lowestOffset, err := lg.LowestOffset()
-			if err != nil {
-				L.Printf("Error while obtaining the lowest offset: %v", err)
-				break
-			}
-
-			highestOffset, err := lg.HighestOffset()
-			if err != nil {
-				L.Printf("Error while obtaining the highest offset: %v", err)
-				break
-			}
-
-			for i := lowestOffset; i <= highestOffset; i++ {
-				record, err := lg.Read(i)
-				if err != nil {
-					L.Printf("Error while reading the record at offset %d: %v", i, err)
-					continue
-				}
-				fmt.Printf("Record at offset %d: %s\n", i, record.Value)
-			}
-
-		case "S":
-			fmt.Println("Exiting...")
-			return
-
-		default:
-			fmt.Println("Invalid option")
+	go func() {
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Fatalf("failed to serve gRPC server: %v", err)
 		}
+	}()
+	defer grpcServer.Stop()
+
+	conn, err := grpc.Dial(":9000", grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("failed to dial gRPC server: %v", err)
 	}
+	defer conn.Close()
+
+	client := api.NewLogClient(conn)
+
+	offset1, err := produce(client, "hello world")
+	if err != nil {
+		log.Fatalf("failed to produce record: %v", err)
+	}
+	fmt.Printf("Produced record at offset: %d\n", offset1)
+
+	offset2, err := produce(client, "hello world 2")
+	if err != nil {
+		log.Fatalf("failed to produce record: %v", err)
+	}
+	fmt.Printf("Produced record at offset: %d\n", offset2)
+
+	offset3, err := produce(client, "hello world 3")
+	if err != nil {
+		log.Fatalf("failed to produce record: %v", err)
+	}
+	fmt.Printf("Produced record at offset: %d\n", offset3)
+
+	record, err := consume(client, offset1)
+	if err != nil {
+		log.Fatalf("failed to consume record: %v", err)
+	}
+	fmt.Printf("Consumed record: %s\n", record)
+
+	record, err = consume(client, offset2)
+	if err != nil {
+		log.Fatalf("failed to consume record: %v", err)
+	}
+	fmt.Printf("Consumed record: %s\n", record)
+
+	record, err = consume(client, offset3)
+	if err != nil {
+		log.Fatalf("failed to consume record: %v", err)
+	}
+	fmt.Printf("Consumed record: %s\n", record)
+}
+
+func produce(client api.LogClient, value string) (int64, error) {
+	produceResponse, err := client.Produce(context.Background(), &api.ProduceRequest{
+		Record: &api.Record{
+			Value: []byte(value),
+		},
+	})
+	if err != nil {
+		return 0, err
+	}
+	return int64(produceResponse.Offset), nil
+}
+
+func consume(client api.LogClient, offset int64) (string, error) {
+	consumeResponse, err := client.Consume(context.Background(), &api.ConsumeRequest{
+		Offset: uint64(offset),
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(consumeResponse.Record.Value), nil
 }

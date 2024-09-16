@@ -1,10 +1,9 @@
-// START: types
 package server
 
 import (
 	"context"
-
 	api "service-grpc-conn/api/v1"
+
 	"google.golang.org/grpc"
 )
 
@@ -23,9 +22,6 @@ func newgrpcServer(config *Config) (srv *grpcServer, err error) {
 	return srv, nil
 }
 
-// END: types
-
-// START: newapi
 func NewGRPCServer(config *Config) (*grpc.Server, error) {
 	gsrv := grpc.NewServer()
 	srv, err := newgrpcServer(config)
@@ -41,11 +37,7 @@ func NewGRPCServer(config *Config) (*grpc.Server, error) {
 	return gsrv, nil
 }
 
-// END: newapi
-
-// START: request_response
-func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (
-	*api.ProduceResponse, error) {
+func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (*api.ProduceResponse, error) {
 	offset, err := s.CommitLog.Append(req.Record)
 	if err != nil {
 		return nil, err
@@ -53,8 +45,7 @@ func (s *grpcServer) Produce(ctx context.Context, req *api.ProduceRequest) (
 	return &api.ProduceResponse{Offset: offset}, nil
 }
 
-func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (
-	*api.ConsumeResponse, error) {
+func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (*api.ConsumeResponse, error) {
 	record, err := s.CommitLog.Read(req.Offset)
 	if err != nil {
 		return nil, err
@@ -62,9 +53,6 @@ func (s *grpcServer) Consume(ctx context.Context, req *api.ConsumeRequest) (
 	return &api.ConsumeResponse{Record: record}, nil
 }
 
-// END: request_response
-
-// START: stream
 func (s *grpcServer) ProduceStream(
 	stream api.Log_ProduceStreamServer,
 ) error {
@@ -82,8 +70,6 @@ func (s *grpcServer) ProduceStream(
 		}
 	}
 }
-
-// START: consume_stream
 
 func (s *grpcServer) ConsumeStream(
 	req *api.ConsumeRequest,
@@ -110,13 +96,7 @@ func (s *grpcServer) ConsumeStream(
 	}
 }
 
-// END: consume_stream
-// END: stream
-
-// START: commitlog
 type CommitLog interface {
 	Append(*api.Record) (uint64, error)
 	Read(uint64) (*api.Record, error)
 }
-
-// END: commitlog
