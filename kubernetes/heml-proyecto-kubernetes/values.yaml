@@ -1,0 +1,9 @@
+image:
+  repository: proyecto-kubernetes
+  tag: latest
+  pullPolicy: Never
+
+job:
+  name: proyecto-kubernetes-job
+  command: ["bash", "-c", "./run_tests.sh"]
+  restartPolicy: Never

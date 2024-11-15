@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: proyecto-kubernetes-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: proyecto-kubernetes
+        image: proyecto-kubernetes
+        imagePullPolicy: Never
+        command: ["bash", "-c", "./run_tests.sh"]
+      restartPolicy: Never
